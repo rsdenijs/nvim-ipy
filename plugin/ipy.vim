@@ -13,6 +13,10 @@ hi IPyIn ctermfg=green cterm=bold
 hi IPyOut ctermfg=red cterm=bold
 
 hi IPyBold cterm=bold
+for i in range(0,8)
+    execute "hi IPyFg".i." ctermfg=".i
+    execute "hi IPyFg".i."Bold ctermfg=".i." cterm=bold"
+endfor
 
 function! IPyWordObjinfo()
     let isk_save = &isk

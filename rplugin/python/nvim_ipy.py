@@ -166,8 +166,19 @@ class IPythonPlugin(object):
         for i,line in enumerate(data.split("\n")):
             for chunk in self.hl_handler.split_string(line):
                 l = len(chunk)
-                if self.hl_handler.bold or self.hl_handler.intensity > 0:
-                    self.add_highlight("IPyBold", lineno+i, colpos, colpos+l+1)
+                bold = self.hl_handler.bold or self.hl_handler.intensity > 0
+                color = self.hl_handler.foreground_color
+                if color and color > 8: color = None
+
+                if color is not None:
+                    name = "IPyFg{}".format(color)
+                    if bold: name += "Bold"
+                elif bold:
+                    name = "IPyBold"
+                else:
+                    name = None
+                if name:
+                    self.add_highlight(name, lineno+i, colpos, colpos+l+1)
                 colpos += l
             colpos = 1
 
@@ -228,7 +239,7 @@ class IPythonPlugin(object):
                     break
             else:
                 return #reopen window?
-        vim.command("set ft={}".format(lang))
+        #vim.command("set ft={}".format(lang))
 
         vim.current.window = w0
 
@@ -297,12 +308,13 @@ class IPythonPlugin(object):
             return
         self.append_outbuf("\n")
         for field in ['name','namespace','type_name','base_class','length','string_form',
-            'file','definition','source','docstring']:
+            'file','definition','source', 'init_definition', 'docstring']:
             if c.get(field) is None:
                 continue
             sep = '\n' if c[field].count('\n') else ' '
             #TODO: option for separate doc buffer
-            self.append_outbuf('{}:{}{}\n'.format(field,sep,c[field].rstrip()))
+            line = self.append_outbuf_esc('{}:{}{}\n'.format(field,sep,c[field].rstrip()))
+            self.add_highlight('Statement', line, 1, len(field)+2)
 
     @neovim.function("IPyInterrupt")
     def on_ipy_interrupt(self, args):
@@ -336,7 +348,7 @@ class IPythonPlugin(object):
             res = c['data']['text/plain']
             prompt = self.prompt_out.format(c['execution_count'])
             # not 100% reliable, append_outbuf should do all highlighting
-            line = self.append_outbuf((self.prompt_out + '{}\n').format(no, res.rstrip()))
+            line = self.append_outbuf_esc((self.prompt_out + '{}\n').format(no, res.rstrip()))
             self.add_highlight('IPyOut', line, 1, len(prompt))
         elif t == 'pyerr':
             #TODO: this should be made language specific
@@ -344,10 +356,10 @@ class IPythonPlugin(object):
             self.append_outbuf_esc('\n'.join(c['traceback']) + '\n')
         elif t == 'stream':
             #perhaps distinguish stderr using gutter marks?
-            self.append_outbuf(c['data'])
+            self.append_outbuf_esc(c['data'])
         elif t == 'display_data':
             d = c['data']['text/plain']
-            self.append_outbuf(d + '\n')
+            self.append_outbuf_esc(d + '\n')
 
 
     def on_shell_msg(self, m):
