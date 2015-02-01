@@ -12,6 +12,8 @@ noremap <Plug>(IPy-Terminate) :call IPyTerminate()<cr>
 hi IPyIn ctermfg=green cterm=bold
 hi IPyOut ctermfg=red cterm=bold
 
+hi IPyBold cterm=bold
+
 function! IPyWordObjinfo()
     let isk_save = &isk
     let &isk = '@,48-57,_,192-255,.'

@@ -9,6 +9,8 @@ import IPython
 from IPython.kernel import KernelClient, KernelManager
 from IPython.core.application import BaseIPythonApplication
 from IPython.consoleapp import IPythonConsoleApp
+from IPython.qt.console.ansi_code_processor import AnsiCodeProcessor
+
 import greenlet
 
 # from http://serverfault.com/questions/71285/in-centos-4-4-how-can-i-strip-escape-sequences-from-a-text-file
@@ -131,6 +133,8 @@ class IPythonPlugin(object):
         buf.name = "[ipython]"
         vim.current.window = w0
         self.buf = buf
+        self.hl_handler = AnsiCodeProcessor()
+        self.hl_handler.bold_text_enabled = True
 
     def add_highlight(self, grp, row, start=1, end=-1):
         self.vim.session.request('buffer_add_highlight', self.buf, 1, grp, row, start, end)
@@ -138,13 +142,35 @@ class IPythonPlugin(object):
 
     # FIXME: encoding
     def append_outbuf(self, data):
-        # TODO: replace with some fancy syntax marks instead
+        self.hl_handler.reset_sgr()
         data = strip_ansi.sub('', data)
         lineno = len(self.buf)
         lastline = self.buf[-1]
 
         txt = lastline + data
         self.buf[-1:] = txt.split("\n") # not splitlines
+        for w in self.vim.windows:
+            if w.buffer == self.buf:
+                w.cursor = [len(self.buf), int(1e9)]
+        return lineno
+
+    # FIXME: encoding
+    def append_outbuf_esc(self, data):
+        lineno = len(self.buf)
+        lastline = self.buf[-1]
+        colpos = len(lastline)+1
+
+        textdata = strip_ansi.sub('', data)
+        txt = lastline + textdata
+        self.buf[-1:] = txt.split("\n") # not splitlines
+        for i,line in enumerate(data.split("\n")):
+            for chunk in self.hl_handler.split_string(line):
+                l = len(chunk)
+                if self.hl_handler.bold or self.hl_handler.intensity > 0:
+                    self.add_highlight("IPyBold", lineno+i, colpos, colpos+l+1)
+                colpos += l
+            colpos = 1
+
         for w in self.vim.windows:
             if w.buffer == self.buf:
                 w.cursor = [len(self.buf), int(1e9)]
@@ -315,7 +341,7 @@ class IPythonPlugin(object):
         elif t == 'pyerr':
             #TODO: this should be made language specific
             # as the amt of info in 'traceback' differs
-            self.append_outbuf('\n'.join(c['traceback']) + '\n')
+            self.append_outbuf_esc('\n'.join(c['traceback']) + '\n')
         elif t == 'stream':
             #perhaps distinguish stderr using gutter marks?
             self.append_outbuf(c['data'])
