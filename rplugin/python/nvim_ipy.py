@@ -113,16 +113,11 @@ class IPythonPlugin(object):
         #FIXME: rethink the entire configuration interface thing
         self.max_in = self.vim.vars.get("ipy_truncate_input", 0)
         if self.vim.vars.get("ipy_shortprompt", False):
-            self.prompt_in = " {}: "
-            self.prompt_out = "_{}: "
-            #TODO: use concealends instead
-            self.re_in = r"^ [0-9]\+:"
-            self.re_out = r"_[0-9]\+:"
+            self.prompt_in  = "{}: "
+            self.prompt_out = "{}: "
         else:
-            self.prompt_in = "In[{}]: "
+            self.prompt_in  = "In[{}]: "
             self.prompt_out = "Out[{}]: "
-            self.re_in = r"^In"
-            self.re_out = r"^Out"
 
     def create_outbuf(self):
         vim = self.vim
@@ -137,10 +132,15 @@ class IPythonPlugin(object):
         vim.current.window = w0
         self.buf = buf
 
+    def add_highlight(self, grp, row, start=1, end=-1):
+        self.vim.session.request('buffer_add_highlight', self.buf, 1, grp, row, start, end)
+
+
     # FIXME: encoding
     def append_outbuf(self, data):
         # TODO: replace with some fancy syntax marks instead
         data = strip_ansi.sub('', data)
+        lineno = len(self.buf)
         lastline = self.buf[-1]
 
         txt = lastline + data
@@ -148,6 +148,7 @@ class IPythonPlugin(object):
         for w in self.vim.windows:
             if w.buffer == self.buf:
                 w.cursor = [len(self.buf), int(1e9)]
+        return lineno
 
     # TODO: should cleanly support reconnecting ( cleaning up previous connection)
     @ipy_async
@@ -190,6 +191,8 @@ class IPythonPlugin(object):
                 "",
                 ]
         self.buf[:0] = banner
+        for i in range(len(banner)):
+            self.add_highlight('Comment', i+1)
 
         w0 = vim.current.window
         if vim.current.buffer != self.buf:
@@ -200,13 +203,6 @@ class IPythonPlugin(object):
             else:
                 return #reopen window?
         vim.command("set ft={}".format(lang))
-        # FIXME: formatting is lost if shell window is closed+reopened
-        for i in range(len(banner)):
-            vim.eval("matchaddpos('Comment', [{}])".format(i+1))
-        vim.vars["ipy_regex_in"] = self.re_in
-        vim.vars["ipy_regex_out"] = self.re_out
-        vim.eval(r"matchadd('IPyIn', g:ipy_regex_in)")
-        vim.eval(r"matchadd('IPyOut', g:ipy_regex_out)")
 
         vim.current.window = w0
 
@@ -307,11 +303,15 @@ class IPythonPlugin(object):
             if self.max_in and len(code) > self.max_in:
                 code = code[:self.max_in] + ['.....']
             sep = '\n'+' '*len(prompt)
-            self.append_outbuf('\n{}{}\n'.format(prompt, sep.join(code)))
+            line = self.append_outbuf('\n{}{}\n'.format(prompt, sep.join(code)))
+            self.add_highlight('IPyIn', line+1, 1, len(prompt))
         elif t == 'pyout':
             no = c['execution_count']
             res = c['data']['text/plain']
-            self.append_outbuf((self.prompt_out + '{}\n').format(no, res.rstrip()))
+            prompt = self.prompt_out.format(c['execution_count'])
+            # not 100% reliable, append_outbuf should do all highlighting
+            line = self.append_outbuf((self.prompt_out + '{}\n').format(no, res.rstrip()))
+            self.add_highlight('IPyOut', line, 1, len(prompt))
         elif t == 'pyerr':
             #TODO: this should be made language specific
             # as the amt of info in 'traceback' differs
