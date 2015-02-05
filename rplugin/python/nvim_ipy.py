@@ -178,7 +178,7 @@ class IPythonPlugin(object):
                 else:
                     name = None
                 if name:
-                    self.add_highlight(name, lineno+i, colpos, colpos+l+1)
+                    self.add_highlight(name, lineno+i, colpos, colpos+l-1)
                 colpos += l
             colpos = 1
 
