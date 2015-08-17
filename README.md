@@ -1,12 +1,19 @@
 # nvim-ipy
 This is a IPython/Jupyter front-end for Neovim, partially based on [ivanov/vim-ipython](https://github.com/ivanov/vim-ipython), but refactored for nvim's plugin architechture and improved async event handling. IPython 3.x or later is required. It uses python2 per default; see below for notes on using python3. It has full support for non-python kernels.
 
-It doesn't have all features of `vim-ipython`, but it has better support for long-running commands that continously produce output, for instance this silly example:
+## Features
+The main feature (relative most similar vim plugins):
+
+- IT HAS ASYNC
+
+This means it has better support for long-running commands that continously produce output, for instance this silly example:
 
     from time import sleep
     for i in range(10):
         sleep(0.5)
         print(i)
+
+It still lack some features from vim-ipython, like displaying docs in a separate window.
 
 ## Connecting/starting kernel
 `:IPython <args>` is interpreted just like the command line `ipython console <args>`, for instance:
@@ -50,6 +57,18 @@ Yes, they exist mainly to quickly test this plugin. Add
 To your nvimrc and map to the generic bindings. For instance:
 
     map <silent> <c-s>   <Plug>(IPy-Run)
+
+## Options?
+
+Are not abound. You can get slimmer input/output prompts by setting
+
+    let g:ipy_shortprompt = 1
+
+I also happen to dislike echoing long multi-line inputs in the output window.
+
+    let g:ipy_truncate_input = 3
+
+will limit the displayed input to the first 3 lines.
 
 ## Exported vimscript functions
 Most useful is `IPyRun("string of code")` which can be called to programmatically execute any code. This is useful to bind common commands to a key.
